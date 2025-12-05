@@ -31,9 +31,13 @@ const generateRandomUsername = () => {
   return `${adj}${noun}${num}`;
 };
 
+type LogLevel = "trace" | "debug" | "info" | "warn" | "error" | "fatal";
+
 export default function Home() {
   const [username, setUsername] = useState<string>("");
   const [feedbackMessage, setFeedbackMessage] = useState<string>("");
+  const [logMessage, setLogMessage] = useState<string>("");
+  const [logLevel, setLogLevel] = useState<LogLevel>("info");
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -44,9 +48,7 @@ export default function Home() {
       username: user,
       id: crypto.randomUUID(),
     });
-
-    showToast(`Registered as ${user}`, "success");
-  }, [showToast]);
+  }, []);
 
   const triggerError = async () => {
     showToast("Triggering error...", "info");
@@ -82,17 +84,9 @@ export default function Home() {
 
         // Simulate N+1 by making 10 sequential API calls
         for (let i = 1; i <= 10; i++) {
-          await Sentry.startSpan(
-            {
-              name: `fetch-item-${i}`,
-              op: "http.client",
-            },
-            async () => {
-              const response = await fetch(`/api/item/${i}`);
-              const data = await response.json();
-              results.push(data);
-            }
-          );
+          const response = await fetch(`/api/item/${i}`);
+          const data = await response.json();
+          results.push(data);
         }
 
         span.setAttribute("items.fetched", results.length);
@@ -126,6 +120,52 @@ export default function Home() {
 
         setFeedbackMessage("");
         showToast("Feedback submitted to Sentry!", "success");
+      }
+    );
+  };
+
+  const sendLog = async () => {
+    if (!logMessage.trim()) {
+      showToast("Please enter a log message", "error");
+      return;
+    }
+
+    showToast(`Sending ${logLevel} log...`, "info");
+
+    await Sentry.startSpan(
+      {
+        name: "send-log-action",
+        op: "ui.action",
+      },
+      async () => {
+        Sentry.logger[logLevel](logMessage, {
+          username,
+          timestamp: new Date().toISOString(),
+        });
+
+        setLogMessage("");
+        showToast(`Log message sent to Sentry!`, "success");
+      }
+    );
+  };
+
+  const triggerLargePayload = async () => {
+    showToast("Fetching large payload...", "info");
+
+    await Sentry.startSpan(
+      {
+        name: "large-payload-fetch",
+        op: "http.client",
+      },
+      async (span) => {
+        const response = await fetch("/api/large-payload");
+        const data = await response.json();
+
+        span.setAttribute("payload.items", data.length);
+        showToast(
+          `Large payload received: ${data.length} items (~1MB)`,
+          "success"
+        );
       }
     );
   };
@@ -197,6 +237,7 @@ export default function Home() {
                 type="text"
                 value={feedbackMessage}
                 onChange={(e) => setFeedbackMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && submitFeedback()}
                 placeholder="Enter feedback message..."
                 className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
               />
@@ -207,6 +248,58 @@ export default function Home() {
                 Submit
               </button>
             </div>
+          </section>
+
+          <section className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
+            <h2 className="text-xl font-semibold text-white mb-2">
+              4. Send Log Message
+            </h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Sends a log message to Sentry using Sentry.logger API
+            </p>
+            <div className="flex gap-3">
+              <select
+                value={logLevel}
+                onChange={(e) => setLogLevel(e.target.value as LogLevel)}
+                className="px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              >
+                <option value="trace">Trace</option>
+                <option value="debug">Debug</option>
+                <option value="info">Info</option>
+                <option value="warn">Warn</option>
+                <option value="error">Error</option>
+                <option value="fatal">Fatal</option>
+              </select>
+              <input
+                type="text"
+                value={logMessage}
+                onChange={(e) => setLogMessage(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && sendLog()}
+                placeholder="Enter log message..."
+                className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-purple-500 focus:border-transparent"
+              />
+              <button
+                onClick={sendLog}
+                className="px-5 py-2.5 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-medium transition-colors"
+              >
+                Send Log
+              </button>
+            </div>
+          </section>
+
+          <section className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
+            <h2 className="text-xl font-semibold text-white mb-2">
+              5. Large HTTP Payload
+            </h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Fetches a ~1MB JSON response to trigger large payload detection
+            </p>
+            <button
+              onClick={triggerLargePayload}
+              className="px-5 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors"
+            >
+              Fetch Large Payload
+            </button>
           </section>
         </div>
 

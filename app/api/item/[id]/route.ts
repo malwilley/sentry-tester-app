@@ -28,7 +28,7 @@ export async function GET(
     },
     async (span) => {
       // Simulate database delay
-      await new Promise((resolve) => setTimeout(resolve, 50));
+      await new Promise((resolve) => setTimeout(resolve, 100));
 
       const itemId = parseInt(id, 10);
       const item = items.find((i) => i.id === itemId);
@@ -37,14 +37,10 @@ export async function GET(
       span.setAttribute("item.found", !!item);
 
       if (!item) {
-        return NextResponse.json(
-          { error: "Item not found" },
-          { status: 404 }
-        );
+        return NextResponse.json({ error: "Item not found" }, { status: 404 });
       }
 
       return NextResponse.json(item);
     }
   );
 }
-
