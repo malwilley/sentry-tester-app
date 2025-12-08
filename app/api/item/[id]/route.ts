@@ -28,7 +28,7 @@ export async function GET(
     },
     async (span) => {
       // Simulate database delay
-      await new Promise((resolve) => setTimeout(resolve, 100));
+      await new Promise((resolve) => setTimeout(resolve, 500));
 
       const itemId = parseInt(id, 10);
       const item = items.find((i) => i.id === itemId);

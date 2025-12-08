@@ -71,30 +71,35 @@ export default function Home() {
     );
   };
 
+  const triggerConsecutiveApiCalls = async () => {
+    showToast("Triggering consecutive API calls...", "info");
+
+    const results: unknown[] = [];
+
+    // Make 10 sequential API calls
+    for (let i = 1; i <= 10; i++) {
+      showToast(`Fetching item ${i}/10...`, "info");
+      const response = await fetch(`/api/item/${i}`);
+      const data = await response.json();
+      results.push(data);
+    }
+
+    showToast(`Fetched ${results.length} items consecutively`, "success");
+  };
+
   const triggerNPlusOne = async () => {
     showToast("Triggering N+1 API calls...", "info");
 
-    await Sentry.startSpan(
-      {
-        name: "n-plus-one-fetch",
-        op: "http.client",
-      },
-      async (span) => {
-        const results: unknown[] = [];
+    // Fire all 10 API calls simultaneously
+    const promises = Array.from({ length: 10 }, (_, i) =>
+      fetch(`/api/item/${i + 1}`).then((res) => res.json())
+    );
 
-        // Simulate N+1 by making 10 sequential API calls
-        for (let i = 1; i <= 10; i++) {
-          const response = await fetch(`/api/item/${i}`);
-          const data = await response.json();
-          results.push(data);
-        }
+    const results = await Promise.all(promises);
 
-        span.setAttribute("items.fetched", results.length);
-        showToast(
-          `N+1 issue triggered: Fetched ${results.length} items sequentially`,
-          "success"
-        );
-      }
+    showToast(
+      `N+1 issue triggered: Fetched ${results.length} items simultaneously`,
+      "success"
     );
   };
 
@@ -106,22 +111,14 @@ export default function Home() {
 
     showToast("Submitting feedback...", "info");
 
-    await Sentry.startSpan(
-      {
-        name: "submit-feedback-action",
-        op: "ui.action",
-      },
-      async () => {
-        Sentry.captureFeedback({
-          message: feedbackMessage,
-          name: username,
-          email: `${username.toLowerCase()}@example.com`,
-        });
+    Sentry.captureFeedback({
+      message: feedbackMessage,
+      name: username,
+      email: `${username.toLowerCase()}@example.com`,
+    });
 
-        setFeedbackMessage("");
-        showToast("Feedback submitted to Sentry!", "success");
-      }
-    );
+    setFeedbackMessage("");
+    showToast("Feedback submitted to Sentry!", "success");
   };
 
   const sendLog = async () => {
@@ -132,42 +129,22 @@ export default function Home() {
 
     showToast(`Sending ${logLevel} log...`, "info");
 
-    await Sentry.startSpan(
-      {
-        name: "send-log-action",
-        op: "ui.action",
-      },
-      async () => {
-        Sentry.logger[logLevel](logMessage, {
-          username,
-          timestamp: new Date().toISOString(),
-        });
+    Sentry.logger[logLevel](logMessage, {
+      username,
+      timestamp: new Date().toISOString(),
+    });
 
-        setLogMessage("");
-        showToast(`Log message sent to Sentry!`, "success");
-      }
-    );
+    setLogMessage("");
+    showToast(`Log message sent to Sentry!`, "success");
   };
 
   const triggerLargePayload = async () => {
     showToast("Fetching large payload...", "info");
 
-    await Sentry.startSpan(
-      {
-        name: "large-payload-fetch",
-        op: "http.client",
-      },
-      async (span) => {
-        const response = await fetch("/api/large-payload");
-        const data = await response.json();
+    const response = await fetch("/api/large-payload");
+    const data = await response.json();
 
-        span.setAttribute("payload.items", data.length);
-        showToast(
-          `Large payload received: ${data.length} items (~1MB)`,
-          "success"
-        );
-      }
-    );
+    showToast(`Large payload received: ${data.length} items (~1MB)`, "success");
   };
 
   return (
@@ -212,22 +189,7 @@ export default function Home() {
 
           <section className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
             <h2 className="text-xl font-semibold text-white mb-2">
-              2. Trigger N+1 Issue
-            </h2>
-            <p className="text-zinc-400 text-sm mb-4">
-              Makes 10 sequential API calls to simulate an N+1 query pattern
-            </p>
-            <button
-              onClick={triggerNPlusOne}
-              className="px-5 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors"
-            >
-              Trigger N+1 Calls
-            </button>
-          </section>
-
-          <section className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
-            <h2 className="text-xl font-semibold text-white mb-2">
-              3. Submit Feedback
+              2. Submit Feedback
             </h2>
             <p className="text-zinc-400 text-sm mb-4">
               Sends user feedback using Sentry.captureFeedback() API
@@ -252,7 +214,7 @@ export default function Home() {
 
           <section className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
             <h2 className="text-xl font-semibold text-white mb-2">
-              4. Send Log Message
+              3. Send Log Message
             </h2>
             <p className="text-zinc-400 text-sm mb-4">
               Sends a log message to Sentry using Sentry.logger API
@@ -289,7 +251,7 @@ export default function Home() {
 
           <section className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
             <h2 className="text-xl font-semibold text-white mb-2">
-              5. Large HTTP Payload
+              4. Large HTTP Payload
             </h2>
             <p className="text-zinc-400 text-sm mb-4">
               Fetches a ~1MB JSON response to trigger large payload detection
@@ -299,6 +261,36 @@ export default function Home() {
               className="px-5 py-2.5 rounded-lg bg-cyan-600 hover:bg-cyan-500 text-white font-medium transition-colors"
             >
               Fetch Large Payload
+            </button>
+          </section>
+
+          <section className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
+            <h2 className="text-xl font-semibold text-white mb-2">
+              5. Consecutive API Calls
+            </h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Makes 10 sequential API calls one after another
+            </p>
+            <button
+              onClick={triggerConsecutiveApiCalls}
+              className="px-5 py-2.5 rounded-lg bg-amber-600 hover:bg-amber-500 text-white font-medium transition-colors"
+            >
+              Trigger Consecutive Calls
+            </button>
+          </section>
+
+          <section className="p-6 rounded-xl bg-zinc-900 border border-zinc-800">
+            <h2 className="text-xl font-semibold text-white mb-2">
+              6. Trigger N+1 Issue
+            </h2>
+            <p className="text-zinc-400 text-sm mb-4">
+              Fires 10 API calls simultaneously to simulate an N+1 query pattern
+            </p>
+            <button
+              onClick={triggerNPlusOne}
+              className="px-5 py-2.5 rounded-lg bg-orange-600 hover:bg-orange-500 text-white font-medium transition-colors"
+            >
+              Trigger N+1 Calls
             </button>
           </section>
         </div>
