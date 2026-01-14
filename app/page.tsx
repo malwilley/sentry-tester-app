@@ -39,6 +39,11 @@ export default function Home() {
   const [logMessage, setLogMessage] = useState<string>("");
   const [logLevel, setLogLevel] = useState<LogLevel>("info");
   const [forceNewIssue, setForceNewIssue] = useState<boolean>(false);
+  const [dsn, setDsn] = useState<string>(
+    (Sentry.getClient()?.getOptions()?.dsn as string | undefined) ??
+      process.env.NEXT_PUBLIC_SENTRY_DSN ??
+      ""
+  );
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -50,6 +55,31 @@ export default function Home() {
       id: crypto.randomUUID(),
     });
   }, []);
+
+  const applyDsn = () => {
+    const nextDsn = dsn.trim();
+    if (!nextDsn) {
+      showToast("Please enter a DSN value", "error");
+      return;
+    }
+
+    const currentOptions = Sentry.getClient()?.getOptions();
+
+    // Re-initialize Sentry so future events use the chosen DSN.
+    // (Sentry doesn't support "hot swapping" DSN without creating a new client.)
+    if (currentOptions) {
+      Sentry.init({
+        ...currentOptions,
+        dsn: nextDsn,
+      });
+    } else {
+      Sentry.init({
+        dsn: nextDsn,
+      });
+    }
+
+    showToast("DSN applied. New events will be sent to this DSN.", "success");
+  };
 
   const triggerError = async () => {
     showToast("Triggering error...", "info");
@@ -165,6 +195,30 @@ export default function Home() {
             Trigger different Sentry issues for testing
           </p>
         </header>
+
+        <div className="mb-8 p-6 rounded-xl bg-zinc-900 border border-zinc-800">
+          <h2 className="text-xl font-semibold text-white mb-2">DSN</h2>
+          <p className="text-zinc-400 text-sm mb-4">
+            Events from this page will be sent to the DSN below.
+          </p>
+          <div className="flex gap-3">
+            <input
+              type="text"
+              value={dsn}
+              onChange={(e) => setDsn(e.target.value)}
+              onKeyDown={(e) => e.key === "Enter" && applyDsn()}
+              placeholder="https://...@o0.ingest.sentry.io/0"
+              className="flex-1 px-4 py-2.5 rounded-lg bg-zinc-800 border border-zinc-700 text-white placeholder:text-zinc-500 focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-transparent font-mono text-sm"
+              aria-label="Sentry DSN"
+            />
+            <button
+              onClick={applyDsn}
+              className="px-5 py-2.5 rounded-lg bg-emerald-600 hover:bg-emerald-500 text-white font-medium transition-colors"
+            >
+              Apply
+            </button>
+          </div>
+        </div>
 
         <div className="mb-8 p-4 rounded-lg bg-zinc-900 border border-zinc-800">
           <div className="flex items-center gap-3">
