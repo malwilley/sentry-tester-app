@@ -38,6 +38,7 @@ export default function Home() {
   const [feedbackMessage, setFeedbackMessage] = useState<string>("");
   const [logMessage, setLogMessage] = useState<string>("");
   const [logLevel, setLogLevel] = useState<LogLevel>("info");
+  const [forceNewIssue, setForceNewIssue] = useState<boolean>(false);
   const { showToast } = useToast();
 
   useEffect(() => {
@@ -59,12 +60,18 @@ export default function Home() {
         op: "ui.action",
       },
       async () => {
+        const fingerprint = forceNewIssue
+          ? [`trigger-error-${crypto.randomUUID()}`]
+          : undefined;
+
         try {
           throw new Error(
             `Test error triggered by ${username} at ${new Date().toISOString()}`
           );
         } catch (error) {
-          Sentry.captureException(error);
+          Sentry.captureException(error, {
+            fingerprint,
+          });
           showToast("Error captured and sent to Sentry!", "success");
         }
       }
@@ -179,6 +186,16 @@ export default function Home() {
             <p className="text-zinc-400 text-sm mb-4">
               Throws an exception and captures it via Sentry.captureException()
             </p>
+            <label className="flex items-center gap-2 text-sm text-zinc-300 mb-4 select-none">
+              <input
+                id="force-new-issue"
+                type="checkbox"
+                className="h-4 w-4 rounded border border-zinc-600 bg-zinc-800 text-blue-500 focus:ring-2 focus:ring-blue-500"
+                checked={forceNewIssue}
+                onChange={(e) => setForceNewIssue(e.target.checked)}
+              />
+              <span>Create new issue (use a unique fingerprint)</span>
+            </label>
             <button
               onClick={triggerError}
               className="px-5 py-2.5 rounded-lg bg-red-600 hover:bg-red-500 text-white font-medium transition-colors"
